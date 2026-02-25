@@ -7,7 +7,7 @@ library(ggplot2)
 library(dplyr)
 
 # Set working directory
-setwd("C:\\Users\\SKY PC\\Documents\\Y3S1\\TPSM\\TPSM Data Set")
+setwd("G:\\TPSM_Assignment_2026\\data\\raw\\MovieData")
 
 # Import all files
 movies <- read.csv("movies.csv", stringsAsFactors = FALSE)
@@ -28,11 +28,13 @@ users_clean <- users %>%
     
     # Age Groups
     age_group = case_when(
-      age < 25 ~ "18-24",
-      age < 35 ~ "25-34",
-      age < 50 ~ "35-49",
-      age >= 50 ~ "50+",
-      TRUE ~ "Unknown"
+      age >= 5  & age <= 12 ~ "5-12",
+      age >= 13 & age <= 18 ~ "13-18",
+      age >= 19 & age <= 25 ~ "19-25",
+      age >= 26 & age <= 35 ~ "26-35",
+      age >= 36 & age <= 50 ~ "36-50",
+      age > 50               ~ "50+",
+      TRUE                   ~ "Unknown"
     ),
     
     # Clean Gender
@@ -83,7 +85,7 @@ user_emotional <- reviews_clean %>%
   ) %>%
   filter(num_reviews >= 3, emotional_sd > 0 | is.na(emotional_sd))
 
-cat("Users with emotional connection scores:", nrow(user_emotional), "\n")
+cat("Users with emotional connection scores:", nrow(user_emotional), "\n")  #1709
 
 # Process WATCH_HISTORY file for Satisfaction
 watch_clean <- watch_history %>%
@@ -139,15 +141,15 @@ master_data <- users_clean %>%
 cat("\n--- Cleaning user_genres data ---\n")
 
 # Step 1: Check original sizes
-cat("Original watch_history rows:", nrow(watch_history), "\n")
-cat("Original movies rows:", nrow(movies), "\n")
+cat("Original watch_history rows:", nrow(watch_history), "\n")  #105000 
+cat("Original movies rows:", nrow(movies), "\n")  #1040
 
 # Step 2: Clean watch_history - remove duplicates
 watch_history_clean <- watch_history %>%
   distinct(user_id, movie_id, .keep_all = TRUE)
 
 cat("watch_history after deduplication:", nrow(watch_history_clean), "rows (", 
-    nrow(watch_history) - nrow(watch_history_clean), "duplicates removed)\n")
+    nrow(watch_history) - nrow(watch_history_clean), "duplicates removed)\n")  # 99470 rows ( 5530 duplicates removed)
 
 # Step 3: Clean movies - ensure unique movie_ids
 movies_clean <- movies %>%
@@ -155,27 +157,27 @@ movies_clean <- movies %>%
   select(movie_id, genre_primary)
 
 cat("movies after deduplication:", nrow(movies_clean), "rows (", 
-    nrow(movies) - nrow(movies_clean), "duplicates removed)\n")
+    nrow(movies) - nrow(movies_clean), "duplicates removed)\n")  #1000 rows ( 40 duplicates removed)
 
 # Step 4: Check for missing genres
 movies_with_genre <- movies_clean %>%
   filter(!is.na(genre_primary) & genre_primary != "")
 
 cat("movies with valid genre:", nrow(movies_with_genre), "rows (", 
-    nrow(movies_clean) - nrow(movies_with_genre), "without genre)\n")
+    nrow(movies_clean) - nrow(movies_with_genre), "without genre)\n")  #1000 rows ( 0 without genre)
 
 # Step 5: Perform join
 user_genres_raw <- watch_history_clean %>%
   left_join(movies_with_genre, by = "movie_id", relationship = "many-to-many")
 
-cat("After join:", nrow(user_genres_raw), "rows\n")
+cat("After join:", nrow(user_genres_raw), "rows\n") #99470 rows
 
 # Step 6: Remove movies without genre
 user_genres_with_genre <- user_genres_raw %>%
   filter(!is.na(genre_primary))
 
 cat("After removing missing genres:", nrow(user_genres_with_genre), "rows (", 
-    nrow(user_genres_raw) - nrow(user_genres_with_genre), "removed)\n")
+    nrow(user_genres_raw) - nrow(user_genres_with_genre), "removed)\n")  #99470 rows ( 0 removed)
 
 # Step 7: Get preferred genre per user
 user_genres <- user_genres_with_genre %>%
@@ -185,7 +187,7 @@ user_genres <- user_genres_with_genre %>%
   slice_max(order_by = genre_count, n = 1, with_ties = FALSE) %>%
   select(user_id, preferred_genre = genre_primary)
 
-cat("Final user_genres created with", nrow(user_genres), "users\n")
+cat("Final user_genres created with", nrow(user_genres), "users\n") # 10000 users
 
 # Step 8: Show top genres
 cat("\nTop 10 preferred genres:\n")
@@ -211,7 +213,7 @@ master_data_final <- master_data %>%
     num_ratings >= 3
   )
 
-cat("\nFinal dataset size:", nrow(master_data_final), "users\n")
+cat("\nFinal dataset size:", nrow(master_data_final), "users\n")  #513 users
 
 # AFTER your data cleaning (with your 482 rows)
 set.seed(123)
@@ -236,21 +238,31 @@ age_stats <- movie_1500 %>%
     median_age = median(age, na.rm = TRUE)
   )
 print("Age Statistics:")
-print(age_stats)
+print(age_stats)  # mean_age  sd_age min_age max_age median_age
+                  # 35.61467 12.2182       5      96         36
 
 # Age groups distribution
 age_group_dist <- movie_1500 %>%
   count(age_group) %>%
   mutate(percentage = n/sum(n)*100)
 print("\nAge Group Distribution:")
-print(age_group_dist)
+print(age_group_dist) #age_group   n    percentage
+                      # 5-12      59        3.933333
+                      # 13-18     62       4.133333
+                      # 19-25     164       10.933333
+                      # 26-35     450       30.000000
+                      # 36-50     587       39.133333
+                      # 50+       178         11.866667
 
 # Gender distribution
 gender_dist <- movie_1500 %>%
   count(gender) %>%
   mutate(percentage = n/sum(n)*100)
-print("\nGender Distribution:")
-print(gender_dist)
+print("Gender Distribution:")
+print(gender_dist)    #gender                 n     percentage
+                      # Female                526   35.06667
+                      # Male                  624   41.60000
+                      # Other/Not Specified   350   23.33333
 
 # Country distribution (top 10)
 country_dist <- movie_1500 %>%
@@ -259,7 +271,9 @@ country_dist <- movie_1500 %>%
   head(10) %>%
   mutate(percentage = n/sum(n)*100)
 print("\nTop 10 Countries:")
-print(country_dist)
+print(country_dist)   #country    n     percentage
+                      # USA       1063   70.86667
+                      # Canada    437   29.13333
 
 # Visualize demographics
 # Age histogram
@@ -291,7 +305,11 @@ emotional_stats <- movie_1500 %>%
     kurtosis = psych::kurtosi(emotional_connection)
   )
 print("Emotional Connection Statistics:")
-print(emotional_stats)
+print(emotional_stats)   #mean_emotional sd_emotional min_emotional max_emotional median_emotional
+                        # 6.848319     1.319502      3.056667         9.775         7.021667
+                        
+                        #skewness   kurtosis
+                        #-0.3643297 -0.2460691
 
 # Distribution visualization
 # Histogram
@@ -322,8 +340,12 @@ emo_by_gender <- movie_1500 %>%
     sd_emo = sd(emotional_connection, na.rm = TRUE),
     n = n()
   )
-print("\nEmotional Connection by Gender:")
-print(emo_by_gender)
+print("Emotional Connection by Gender:")
+print(emo_by_gender)  #gender              mean_emo   sd_emo    n
+                      #<chr>                  <dbl>  <dbl>    <int>
+                      #Female                  6.96   1.28    526
+                      #Male                    6.75   1.37    624
+                      #Other/Not Specified     6.85   1.27    350
 
 # By age group
 emo_by_age <- movie_1500 %>%
@@ -334,8 +356,15 @@ emo_by_age <- movie_1500 %>%
     n = n()
   ) %>%
   arrange(age_group)
-print("\nEmotional Connection by Age Group:")
-print(emo_by_age)
+print("Emotional Connection by Age Group:")
+print(emo_by_age)    # age_group    mean_emo    sd_emo  n
+                    #<chr>          <dbl>       <dbl> <int>
+                    # 5-12          7.09        1.02    59
+                    # 13-18         7.24        1.13    62
+                    #19-25         7.15         1.19   164
+                    #26-35         6.80         1.42   450
+                    #36-50         6.85         1.29   587
+                    #50+           6.47         1.33   178
 
 # Visualize emotional connection by groups
 # By gender
@@ -369,7 +398,8 @@ satisfaction_stats <- movie_1500 %>%
     kurtosis = psych::kurtosi(satisfaction)
   )
 print("Satisfaction Statistics:")
-print(satisfaction_stats)
+print(satisfaction_stats)   #mean_sat   sd_sat      min_sat     max_sat   median_sat   skewness   kurtosis
+                            #3.37768    0.6781707   1.333333       5      3.333333    -0.3174264 -0.1333199
 
 # 3.2 Distribution visualization (you already have these)
 # Histogram with density
@@ -549,6 +579,14 @@ satisfaction_demographics_table <- movie_1500 %>%
 
 print("\nSatisfaction by Age Group and Gender (Cross-tabulation):")
 print(satisfaction_demographics_table)
+# age_group          mean_satisfaction_Female   mean_satisfaction_Male
+#<chr>                        <dbl>                  <dbl>
+#0-12                          3.66                   3.47
+# 13-18                         3.59                   3.3 
+# 19-25                         3.41                   3.3 
+# 26-35                         3.29                   3.39
+# 36-50                         3.26                   3.35
+# 50+                           3.3                    3.58
 
 # PART 4: EMOTION-SATISFACTION RELATIONSHIP
 
@@ -558,10 +596,10 @@ cor_test <- cor.test(movie_1500$emotional_connection,
                      method = "pearson")
 
 print("Correlation between Emotional Connection and Satisfaction:")
-print(paste("Pearson r =", round(cor_test$estimate, 3)))
-print(paste("p-value =", round(cor_test$p.value, 4)))
+print(paste("Pearson r =", round(cor_test$estimate, 3)))  #r = 0.033
+print(paste("p-value =", round(cor_test$p.value, 4)))     #p-value = 0.2033
 print(paste("95% CI: [", round(cor_test$conf.int[1], 3), ",", 
-            round(cor_test$conf.int[2], 3), "]"))
+            round(cor_test$conf.int[2], 3), "]"))          #[ -0.018 , 0.083 ]
 
 # 4.2 Scatter plot with trend line - FIXED
 ggplot(movie_1500, aes(x = emotional_connection, y = satisfaction)) +
@@ -603,7 +641,15 @@ sat_by_emotion_group <- movie_1500 %>%
   arrange(emotional_group)
 
 print("\nSatisfaction by Emotional Connection Group:")
-print(sat_by_emotion_group)
+print(sat_by_emotion_group) 
+#emotional_group mean_satisfaction sd_satisfaction     n     se ci_lower
+#<chr>                       <dbl>           <dbl> <int>  <dbl>    <dbl>
+# High Emotion                 3.41           0.720   377 0.0371     3.34
+# Low Emotion                  3.33           0.679   374 0.0351     3.26
+# Medium-High                  3.36           0.732   374 0.0378     3.28
+# Medium-Low                   3.41           0.569   375 0.0294     3.36
+
+
 
 # 4.5 Bar chart of satisfaction by emotional group
 ggplot(sat_by_emotion_group, aes(x = emotional_group, y = mean_satisfaction, 
@@ -620,6 +666,8 @@ ggplot(sat_by_emotion_group, aes(x = emotional_group, y = mean_satisfaction,
                                "Medium-High" = "lightgreen", 
                                "High Emotion" = "darkgreen"))
 
+
+
 # 4.6 Does the relationship hold across groups? (quick check)
 # By gender
 cor_by_gender <- movie_1500 %>%
@@ -631,6 +679,13 @@ cor_by_gender <- movie_1500 %>%
   )
 print("\nCorrelation by Gender:")
 print(cor_by_gender)
+#gender              correlation    p_value       n
+#<chr>                     <dbl>      <dbl>     <int>
+#Female                 -0.0497     0.255        526
+#Male                   -0.00840    0.834        624
+#Other/Not Specified     0.251      0.00000199   350
+
+
 
 # By age group
 cor_by_age <- movie_1500 %>%
@@ -643,6 +698,16 @@ cor_by_age <- movie_1500 %>%
   )
 print("\nCorrelation by Age Group:")
 print(cor_by_age)
+# age_group correlation p_value     n
+#<chr>           <dbl>   <dbl> <int>
+# 0-12         0.149     0.260     59
+#13-18        0.109     0.397     62
+#19-25        0.190     0.0149   164
+#26-35        0.0664    0.160    450
+#36-50       -0.000285  0.995    587
+#50+         -0.0706    0.349    178
+
+
 
 # ============================================================================
 # PART A: MAIN HYPOTHESIS TESTING
@@ -685,16 +750,16 @@ cat("\n--- STEP 2: Simple Regression (Without Demographics) ---\n")
 # Raw model
 model_simple_raw <- lm(satisfaction ~ emotional_connection, data = movie_1500)
 cat("\n▶ Raw Model (original scales):\n")
-cat("   Coefficient =", round(coef(model_simple_raw)[2], 4), "\n")
-cat("   p-value =", round(summary(model_simple_raw)$coefficients[2, 4], 4), "\n")
-cat("   R² =", round(summary(model_simple_raw)$r.squared, 4), "\n")
+cat("   Coefficient =", round(coef(model_simple_raw)[2], 4), "\n")   #0.0169
+cat("   p-value =", round(summary(model_simple_raw)$coefficients[2, 4], 4), "\n")  #0.2033
+cat("   R² =", round(summary(model_simple_raw)$r.squared, 4), "\n")  # R² = 0.0011
 
 # Standardized model
 model_simple_std <- lm(satisfaction_std ~ emotional_connection_std, data = movie_1500)
 cat("\n▶ Standardized Model (scale-free):\n")
-cat("   Standardized β =", round(coef(model_simple_std)[2], 4), "\n")
-cat("   p-value =", round(summary(model_simple_std)$coefficients[2, 4], 4), "\n")
-cat("   R² =", round(summary(model_simple_std)$r.squared, 4), "\n")
+cat("   Standardized β =", round(coef(model_simple_std)[2], 4), "\n")  #β = 0.0329 
+cat("   p-value =", round(summary(model_simple_std)$coefficients[2, 4], 4), "\n")   #p-vaue = 0.2033 
+cat("   R² =", round(summary(model_simple_std)$r.squared, 4), "\n")  #R² = 0.0011 
 
 # Interpretation
 if(summary(model_simple_raw)$coefficients[2, 4] < 0.05) {
@@ -722,8 +787,10 @@ if(!"gender_male" %in% names(movie_1500)) {
 if(!"age_25_34" %in% names(movie_1500)) {
   movie_1500 <- movie_1500 %>%
     mutate(
-      age_25_34 = ifelse(age_group == "25-34", 1, 0),
-      age_35_49 = ifelse(age_group == "35-49", 1, 0),
+      age_13_18 = ifelse(age_group == "13-18", 1, 0),
+      age_19_25 = ifelse(age_group == "19-25", 1, 0),
+      age_26_35 = ifelse(age_group == "26-35", 1, 0),
+      age_36_50 = ifelse(age_group == "36-50", 1, 0),
       age_50plus = ifelse(age_group == "50+", 1, 0)
     )
 }
@@ -731,7 +798,7 @@ if(!"age_25_34" %in% names(movie_1500)) {
 # RAW MODEL (original scales)
 model_full_raw <- lm(satisfaction ~ emotional_connection + age + 
                        gender_male + gender_other + 
-                       age_25_34 + age_35_49 + age_50plus, 
+                       age_13_18 + age_19_25 + age_26_35 + age_36_50 + age_50plus,  # age_5_12 is reference 
                      data = movie_1500)
 
 cat("\n▶ RAW MODEL RESULTS (original scales):\n")
@@ -760,8 +827,8 @@ emo_coef_std <- coef(model_full_std)["emotional_connection_std"]
 emo_p_std <- summary_std$coefficients["emotional_connection_std", 4]
 
 cat("\n▶ Emotional Connection (standardized):\n")
-cat("   Standardized β =", round(emo_coef_std, 4), "\n")
-cat("   p-value =", round(emo_p_std, 4), "\n")
+cat("   Standardized β =", round(emo_coef_std, 4), "\n")  # β = 0.0403 
+cat("   p-value =", round(emo_p_std, 4), "\n")  #0.1203
 
 #------------------------------------------------------------------------------
 # Step 4: Test if Adding Demographics Improves the Model
@@ -844,6 +911,14 @@ hypothesis_summary <- data.frame(
 )
 
 print(hypothesis_summary)
+  
+# Model                      Predictor             Coefficient       Std_Coefficient
+#Simple (no controls)       Emotional Connection      0.0169          0.0329
+# Full (with demographics)  Emotional Connection      0.0207          0.0403
+
+#P_value   Significant
+#0.2033          NO
+#0.1203          NO
 
 cat("\n", rep("=", 80), "\n")
 cat("END OF MAIN HYPOTHESIS TESTING\n")
@@ -875,7 +950,8 @@ movie_1500 <- movie_1500 %>%
   )
 
 cat("\n--- Emotional Connection Groups (Median Split) ---\n")
-table(movie_1500$emotion_level)
+table(movie_1500$emotion_level)   #High Emotion  Low Emotion 
+                                  #751              749 
 
 #------------------------------------------------------------------------------
 # Step 2: METHOD 1 - Compare MEANS (t-test)
@@ -1231,539 +1307,5 @@ if(all(!results_dist$Significant)) {
   cat("  This suggests the relationship depends on distributional assumptions.\n")
 }
 
-# ============================================================================
-# PART D: COMPLETE MULTIPLE REGRESSION ANALYSIS (LO3) - FIXED VERSION
-# Testing: "Audiences who feel emotionally connected report higher satisfaction"
-# With demographic controls: age, gender
-# ============================================================================
 
-cat("\n", rep("=", 80), "\n")
-cat("PART D: COMPLETE MULTIPLE REGRESSION ANALYSIS\n")
-cat(rep("=", 80), "\n")
-
-# Ensure we have the correct model with ALL demographic controls
-# Reference categories: Female (gender), 18-24 (age group)
-
-#------------------------------------------------------------------------------
-# 1. REGRESSION DIAGNOSTICS - Formal Tests
-#------------------------------------------------------------------------------
-
-cat("\n--- 1. REGRESSION DIAGNOSTICS ---\n")
-
-# Load required libraries
-if(!require(lmtest)) install.packages("lmtest")
-if(!require(car)) install.packages("car")
-library(lmtest)
-library(car)
-
-# Use your full model with all controls
-model_full <- lm(satisfaction ~ emotional_connection + age + 
-                   gender_male + gender_other + 
-                   age_25_34 + age_35_49 + age_50plus, 
-                 data = movie_1500)
-
-# 1.1 Normality of Residuals (Shapiro-Wilk test)
-cat("\n1.1 Normality of Residuals:\n")
-cat("    This checks if errors are Normally distributed\n")
-resid_norm <- shapiro.test(residuals(model_full))
-cat("    Shapiro-Wilk W =", round(resid_norm$statistic, 4), "\n")
-cat("    p-value =", round(resid_norm$p.value, 4), "\n")
-if(resid_norm$p.value > 0.05) {
-  cat("    ✓ Residuals are Normal - assumption met\n")
-} else {
-  cat("    ✗ Residuals are NOT Normal - assumption violated\n")
-  cat("      Note: With large samples, this is less concerning\n")
-}
-
-# 1.2 Homoscedasticity (Breusch-Pagan test)
-cat("\n1.2 Homoscedasticity (Constant Variance):\n")
-cat("    This checks if error variance is constant across predictions\n")
-bp_test <- bptest(model_full)
-cat("    BP =", round(bp_test$statistic, 4), "\n")
-cat("    p-value =", round(bp_test$p.value, 4), "\n")
-if(bp_test$p.value > 0.05) {
-  cat("    ✓ Constant variance - assumption met\n")
-} else {
-  cat("    ✗ Heteroscedasticity detected - variance not constant\n")
-  cat("      Consider using robust standard errors\n")
-}
-
-# 1.3 Multicollinearity (VIF)
-cat("\n1.3 Multicollinearity:\n")
-cat("    This checks if predictors are too highly correlated\n")
-vif_vals <- vif(model_full)
-print(round(vif_vals, 3))
-cat("\n    Interpretation: VIF > 5 indicates problematic multicollinearity\n")
-if(max(vif_vals) > 5) {
-  cat("    ✗ Multicollinearity detected - variables are redundant\n")
-  cat("      Consider removing some predictors\n")
-} else {
-  cat("    ✓ No serious multicollinearity issues\n")
-}
-
-# 1.4 Influential Points (Cook's Distance)
-cat("\n1.4 Influential Points (Cook's Distance):\n")
-cat("    This identifies points that disproportionately influence results\n")
-cooks_d <- cooks.distance(model_full)
-influential <- which(cooks_d > 4/nrow(movie_1500))
-cat("    Number of influential points:", length(influential), "\n")
-cat("    Percentage of data:", round(length(influential)/nrow(movie_1500)*100, 2), "%\n")
-if(length(influential) < 0.05 * nrow(movie_1500)) {
-  cat("    ✓ Acceptable level of influence (< 5%)\n")
-} else {
-  cat("    ⚠ High proportion of influential points\n")
-}
-
-# Diagnostic plots
-par(mfrow = c(2, 2))
-plot(model_full)
-title("Regression Diagnostic Plots", outer = TRUE, line = -2)
-
-#------------------------------------------------------------------------------
-# 2. LACK OF FIT TEST (Fixed version)
-#------------------------------------------------------------------------------
-
-cat("\n--- 2. LACK OF FIT TEST ---\n")
-cat("    This tests if your model form is correct\n")
-cat("    (Does the linear model adequately fit the data?)\n")
-
-# Create groups based on emotional connection (for replication)
-movie_1500$emo_group_lof <- cut(movie_1500$emotional_connection, 
-                                breaks = 5, 
-                                include.lowest = TRUE,
-                                labels = FALSE)
-
-# Check if groups were created properly
-group_counts <- table(movie_1500$emo_group_lof)
-cat("\nGroups created:\n")
-print(group_counts)
-
-# Pure error model (group means) - only if we have multiple groups with >1 observation
-if(length(unique(movie_1500$emo_group_lof)) > 1 && min(group_counts) > 1) {
-  
-  pure_error_model <- lm(satisfaction ~ as.factor(emo_group_lof), data = movie_1500)
-  pure_error_ss <- sum(residuals(pure_error_model)^2)
-  pure_error_df <- df.residual(pure_error_model)
-  
-  # Lack of fit from regression model
-  lof_ss <- sum(residuals(model_full)^2) - pure_error_ss
-  lof_df <- model_full$df.residual - pure_error_df
-  
-  # Ensure we don't have negative or zero degrees of freedom
-  if(lof_df > 0 && pure_error_df > 0) {
-    lof_ms <- lof_ss / lof_df
-    pure_error_ms <- pure_error_ss / pure_error_df
-    lof_f <- lof_ms / pure_error_ms
-    lof_p <- pf(lof_f, lof_df, pure_error_df, lower.tail = FALSE)
-    
-    cat("\nLack of Fit Test Results:\n")
-    cat("  F-statistic =", round(lof_f, 3), "\n")
-    cat("  p-value =", round(lof_p, 4), "\n")
-    
-    if(lof_p > 0.05) {
-      cat("  ✓ No significant lack of fit\n")
-      cat("    The linear model adequately represents the data\n")
-    } else {
-      cat("  ✗ Significant lack of fit detected\n")
-      cat("    The relationship may be non-linear\n")
-    }
-  } else {
-    cat("\n⚠ Cannot compute Lack of Fit test - insufficient degrees of freedom\n")
-    lof_p <- NA
-  }
-} else {
-  cat("\n⚠ Cannot compute Lack of Fit test - need multiple groups with >1 observation each\n")
-  lof_p <- NA
-}
-
-#------------------------------------------------------------------------------
-# 3. SOLUTIONS TO MODEL DEPARTURES
-#------------------------------------------------------------------------------
-
-cat("\n--- 3. SOLUTIONS TO MODEL DEPARTURES ---\n")
-
-# 3.1 If heteroscedasticity detected, use robust standard errors
-if(exists("bp_test") && !is.na(bp_test$p.value) && bp_test$p.value < 0.05) {
-  cat("\n3.1 Heteroscedasticity detected - Using Robust Standard Errors:\n")
-  if(!require(sandwich)) install.packages("sandwich")
-  library(sandwich)
-  
-  # Robust standard errors
-  robust_se <- sqrt(diag(vcovHC(model_full, type = "HC3")))
-  robust_coef <- coef(model_full)
-  robust_t <- robust_coef / robust_se
-  robust_p <- 2 * (1 - pnorm(abs(robust_t)))
-  
-  # Compare original vs robust
-  comparison_se <- data.frame(
-    Predictor = names(robust_coef),
-    Original_SE = round(summary(model_full)$coefficients[, 2], 4),
-    Robust_SE = round(robust_se, 4),
-    Original_p = round(summary(model_full)$coefficients[, 4], 4),
-    Robust_p = round(robust_p, 4)
-  )
-  print(comparison_se)
-  
-  cat("\n   Emotional connection p-value (original):", 
-      round(summary(model_full)$coefficients["emotional_connection", 4], 4), "\n")
-  cat("   Emotional connection p-value (robust):", 
-      round(robust_p["emotional_connection"], 4), "\n")
-} else {
-  cat("\n3.1 No heteroscedasticity detected or test not available\n")
-}
-
-# 3.2 Check for non-linearity by trying polynomial terms (directly, without relying on lof_p)
-cat("\n3.2 Testing for non-linear relationship:\n")
-cat("    Checking if emotional connection has a curved relationship with satisfaction\n")
-
-# Add squared term
-movie_1500$emotional_connection_sq <- movie_1500$emotional_connection^2
-
-model_poly <- lm(satisfaction ~ emotional_connection + emotional_connection_sq + 
-                   age + gender_male + gender_other + 
-                   age_25_34 + age_35_49 + age_50plus, 
-                 data = movie_1500)
-
-cat("\n   Polynomial Model Summary (checking squared term):\n")
-poly_summary <- summary(model_poly)
-print(poly_summary)
-
-# Check if squared term is significant
-if("emotional_connection_sq" %in% rownames(poly_summary$coefficients)) {
-  poly_sq_p <- poly_summary$coefficients["emotional_connection_sq", 4]
-  cat("\n   Squared term p-value =", round(poly_sq_p, 4), "\n")
-  
-  if(poly_sq_p < 0.05) {
-    cat("   ✓ Significant quadratic relationship detected!\n")
-    cat("     The effect of emotional connection on satisfaction is CURVED\n")
-    
-    # Determine direction of curve
-    sq_coef <- coef(model_poly)["emotional_connection_sq"]
-    if(sq_coef > 0) {
-      cat("     U-shaped curve: satisfaction decreases then increases\n")
-    } else {
-      cat("     Inverted U-shaped curve: satisfaction increases then decreases\n")
-    }
-  } else {
-    cat("   ✗ No significant quadratic relationship\n")
-    cat("     The relationship appears linear (or flat)\n")
-  }
-  
-  # Compare linear vs polynomial
-  poly_test <- anova(model_full, model_poly)
-  cat("\n   Test of linear vs polynomial:\n")
-  print(poly_test)
-  
-  if(poly_test$`Pr(>F)`[2] < 0.05) {
-    cat("   ✓ Polynomial model fits significantly better\n")
-  } else {
-    cat("   ✗ Polynomial does not improve fit\n")
-  }
-} else {
-  cat("\n   Squared term not available in model\n")
-}
-
-# 3.3 If influential points exist, check model without them
-if(exists("influential") && length(influential) > 0) {
-  cat("\n3.3 Influential points detected - Model without them:\n")
-  
-  if(length(influential) < nrow(movie_1500) * 0.1) {  # Less than 10% of data
-    movie_1500_noinf <- movie_1500[-influential, ]
-    
-    model_noinf <- lm(satisfaction ~ emotional_connection + age + 
-                        gender_male + gender_other + 
-                        age_25_34 + age_35_49 + age_50plus, 
-                      data = movie_1500_noinf)
-    
-    cat("\n   Original emotional connection p-value:", 
-        round(summary(model_full)$coefficients["emotional_connection", 4], 4), "\n")
-    cat("   Without influential points p-value:", 
-        round(summary(model_noinf)$coefficients["emotional_connection", 4], 4), "\n")
-    
-    # Check if conclusion changes
-    orig_sig <- summary(model_full)$coefficients["emotional_connection", 4] < 0.05
-    new_sig <- summary(model_noinf)$coefficients["emotional_connection", 4] < 0.05
-    
-    if(orig_sig != new_sig) {
-      cat("   ⚠ WARNING: Removing influential points CHANGES the conclusion!\n")
-    } else {
-      cat("   ✓ Conclusion remains the same after removing influential points\n")
-    }
-  } else {
-    cat("   Too many influential points to remove ( >10% of data)\n")
-  }
-} else {
-  cat("\n3.3 No influential points detected\n")
-}
-
-
-#------------------------------------------------------------------------------
-# 4. PARTIAL R-SQUARED
-#------------------------------------------------------------------------------
-
-cat("\n--- 4. PARTIAL R-SQUARED ---\n")
-cat("    This shows the UNIQUE variance explained by each predictor\n")
-
-# Function to calculate partial R²
-partial_r2 <- function(full_model, predictor_name) {
-  # Create reduced model without the predictor
-  if(predictor_name == "emotional_connection") {
-    reduced <- lm(satisfaction ~ age + gender_male + gender_other + 
-                    age_25_34 + age_35_49 + age_50plus, data = movie_1500)
-  } else if(predictor_name == "age") {
-    reduced <- lm(satisfaction ~ emotional_connection + gender_male + gender_other + 
-                    age_25_34 + age_35_49 + age_50plus, data = movie_1500)
-  } else if(predictor_name %in% c("gender_male", "gender_other")) {
-    # For gender, we need to keep the other gender dummy
-    if(predictor_name == "gender_male") {
-      reduced <- lm(satisfaction ~ emotional_connection + age + gender_other + 
-                      age_25_34 + age_35_49 + age_50plus, data = movie_1500)
-    } else {
-      reduced <- lm(satisfaction ~ emotional_connection + age + gender_male + 
-                      age_25_34 + age_35_49 + age_50plus, data = movie_1500)
-    }
-  } else {
-    # For age groups - remove all age group dummies
-    reduced <- lm(satisfaction ~ emotional_connection + age + 
-                    gender_male + gender_other, data = movie_1500)
-  }
-  
-  ss_full <- sum(residuals(full_model)^2)
-  ss_reduced <- sum(residuals(reduced)^2)
-  return((ss_reduced - ss_full) / ss_reduced)
-}
-
-# Calculate partial R² for key predictors
-cat("\nPartial R² values (unique variance explained):\n")
-
-pr2_emo <- partial_r2(model_full, "emotional_connection")
-cat("  emotional_connection:", round(pr2_emo, 4), 
-    "(", round(pr2_emo * 100, 2), "% of variance uniquely)\n")
-
-pr2_age_continuous <- partial_r2(model_full, "age")
-cat("  age (continuous):", round(pr2_age_continuous, 4), 
-    "(", round(pr2_age_continuous * 100, 2), "%)\n")
-
-pr2_gender_male <- partial_r2(model_full, "gender_male")
-cat("  gender_male:", round(pr2_gender_male, 4), 
-    "(", round(pr2_gender_male * 100, 2), "%)\n")
-
-pr2_gender_other <- partial_r2(model_full, "gender_other")
-cat("  gender_other:", round(pr2_gender_other, 4), 
-    "(", round(pr2_gender_other * 100, 2), "%)\n")
-
-# Total R² from full model
-cat("\nTotal R² of full model:", round(summary(model_full)$r.squared, 4),
-    "(", round(summary(model_full)$r.squared * 100, 2), "%)\n")
-
-#------------------------------------------------------------------------------
-# 5. VARIABLE SELECTION
-#------------------------------------------------------------------------------
-
-cat("\n--- 5. VARIABLE SELECTION ---\n")
-cat("    Finding the best model to predict satisfaction\n")
-
-if(!require(MASS)) install.packages("MASS")
-library(MASS)
-if(!require(leaps)) install.packages("leaps")
-library(leaps)
-
-# 5.1 Stepwise Selection (based on AIC)
-cat("\n5.1 Stepwise Selection (AIC-based):\n")
-step_model <- stepAIC(model_full, direction = "both", trace = FALSE)
-cat("\n   Selected variables:\n")
-print(names(coef(step_model))[-1])
-cat("\n   Stepwise Model Summary:\n")
-print(summary(step_model))
-
-# 5.2 Backward Elimination
-cat("\n5.2 Backward Elimination:\n")
-backward_model <- stepAIC(model_full, direction = "backward", trace = FALSE)
-cat("   Selected variables:", paste(names(coef(backward_model))[-1], collapse = ", "), "\n")
-
-# 5.3 Forward Selection
-cat("\n5.3 Forward Selection:\n")
-null_model <- lm(satisfaction ~ 1, data = movie_1500)
-forward_model <- stepAIC(null_model, direction = "forward",
-                         scope = list(lower = null_model, upper = model_full),
-                         trace = FALSE)
-cat("   Selected variables:", paste(names(coef(forward_model))[-1], collapse = ", "), "\n")
-
-# 5.4 Best Subsets Regression
-cat("\n5.4 Best Subsets Regression:\n")
-predictors <- cbind(movie_1500$emotional_connection, movie_1500$age,
-                    movie_1500$gender_male, movie_1500$gender_other,
-                    movie_1500$age_25_34, movie_1500$age_35_49, movie_1500$age_50plus)
-colnames(predictors) <- c("emo", "age", "gender_male", "gender_other",
-                          "age_25_34", "age_35_49", "age_50plus")
-
-best_subsets <- regsubsets(movie_1500$satisfaction ~ ., 
-                           data = as.data.frame(predictors),
-                           nbest = 2)
-summary_best <- summary(best_subsets)
-
-cat("\n   Best models by Adjusted R²:\n")
-best_idx <- order(summary_best$adjr2, decreasing = TRUE)[1:5]
-for(i in best_idx) {
-  vars <- names(summary_best$which[i, ])[summary_best$which[i, ]][-1]
-  cat("   Size:", summary_best$which[i, ] %>% sum(), 
-      "Adj R²:", round(summary_best$adjr2[i], 4),
-      "Cp:", round(summary_best$cp[i], 2),
-      "Variables:", paste(vars, collapse = ", "), "\n")
-}
-
-#------------------------------------------------------------------------------
-# 6. MODEL COMPARISON
-#------------------------------------------------------------------------------
-
-cat("\n--- 6. MODEL COMPARISON ---\n")
-
-# Create several candidate models
-models <- list(
-  "M1: Emo only" = lm(satisfaction ~ emotional_connection, data = movie_1500),
-  "M2: Emo + Age" = lm(satisfaction ~ emotional_connection + age, data = movie_1500),
-  "M3: Emo + Gender" = lm(satisfaction ~ emotional_connection + gender_male + gender_other, 
-                          data = movie_1500),
-  "M4: Emo + Age + Gender" = lm(satisfaction ~ emotional_connection + age + 
-                                  gender_male + gender_other, data = movie_1500),
-  "M5: Full (with age groups)" = model_full,
-  "M6: Stepwise selected" = step_model
-)
-
-# Comparison table
-comparison <- data.frame(
-  Model = names(models),
-  R2 = sapply(models, function(m) round(summary(m)$r.squared, 4)),
-  Adj_R2 = sapply(models, function(m) round(summary(m)$adj.r.squared, 4)),
-  AIC = sapply(models, AIC),
-  BIC = sapply(models, BIC),
-  Emo_p = sapply(models, function(m) {
-    if("emotional_connection" %in% rownames(summary(m)$coefficients)) {
-      round(summary(m)$coefficients["emotional_connection", 4], 4)
-    } else {
-      NA
-    }
-  })
-)
-
-print(comparison)
-
-cat("\nBest model by Adj R²:", comparison$Model[which.max(comparison$Adj_R2)], "\n")
-cat("Best model by AIC:", comparison$Model[which.min(comparison$AIC)], "\n")
-cat("Best model by BIC:", comparison$Model[which.min(comparison$BIC)], "\n")
-
-#------------------------------------------------------------------------------
-# 7. FINAL INTERPRETATION FOR YOUR SENTENCE (USING FULL MODEL)
-#------------------------------------------------------------------------------
-
-cat("\n", rep("=", 80), "\n")
-cat("FINAL INTERPRETATION: MAIN HYPOTHESIS\n")
-cat(rep("=", 80), "\n")
-
-# Use the FULL MODEL for hypothesis testing (since it includes emotional_connection)
-final_model <- model_full
-
-# Extract emotional connection result
-emo_coef <- coef(final_model)["emotional_connection"]
-emo_p <- summary(final_model)$coefficients["emotional_connection", 4]
-emo_ci <- confint(final_model)["emotional_connection", ]
-
-cat("\n", rep("-", 60), "\n")
-cat("TESTING: 'Audiences who feel emotionally connected report higher satisfaction'\n")
-cat(rep("-", 60), "\n")
-
-cat("\n▶ Results from FULL MODEL (controlling for age and gender):\n")
-cat("   Emotional connection coefficient =", round(emo_coef, 4), "\n")
-cat("   95% Confidence Interval = [", round(emo_ci[1], 4), ", ", round(emo_ci[2], 4), "]\n")
-cat("   p-value =", round(emo_p, 4), "\n")
-
-if(emo_p < 0.05) {
-  cat("\n✓✓✓ STATISTICALLY SIGNIFICANT!\n")
-  if(emo_coef > 0) {
-    cat("   As emotional connection increases, satisfaction increases.\n")
-    cat("   This SUPPORTS your hypothesis.\n")
-  } else {
-    cat("   However, the relationship is NEGATIVE.\n")
-    cat("   This CONTRADICTS your hypothesis.\n")
-  }
-} else {
-  cat("\n✗✗✗ NOT STATISTICALLY SIGNIFICANT\n")
-  cat("   Emotional connection does NOT predict satisfaction\n")
-  cat("   after controlling for age and gender.\n")
-  cat("   p-value =", round(emo_p, 4), "> 0.05\n")
-  cat("   This does NOT support your hypothesis.\n")
-}
-
-# Check if confidence interval contains zero
-if(emo_ci[1] < 0 & emo_ci[2] > 0) {
-  cat("\n   The confidence interval contains ZERO,\n")
-  cat("   confirming the relationship is not significant.\n")
-}
-
-# Compare with models that don't include emotional connection
-cat("\n", rep("-", 60), "\n")
-cat("DOES ADDING EMOTIONAL CONNECTION IMPROVE THE MODEL?\n")
-cat(rep("-", 60), "\n")
-
-# Model without emotional connection
-model_no_emo <- lm(satisfaction ~ age + gender_male + gender_other + 
-                     age_25_34 + age_35_49 + age_50plus, data = movie_1500)
-
-compare_emo <- anova(model_no_emo, model_full)
-print(compare_emo)
-
-if(!is.na(compare_emo$`Pr(>F)`[2]) && compare_emo$`Pr(>F)`[2] < 0.05) {
-  cat("\n✓ Adding emotional connection SIGNIFICANTLY improves the model\n")
-} else {
-  cat("\n✗ Adding emotional connection does NOT significantly improve the model\n")
-}
-
-#------------------------------------------------------------------------------
-# 8. SUMMARY TABLE FOR REPORT
-#------------------------------------------------------------------------------
-
-cat("\n", rep("=", 80), "\n")
-cat("SUMMARY: MULTIPLE REGRESSION ANALYSIS (LO3)\n")
-cat(rep("=", 80), "\n")
-
-summary_table <- data.frame(
-  Analysis = c(
-    "Main Hypothesis (emotional_connection)",
-    "Demographics - Age (continuous)",
-    "Demographics - Gender (Male)",
-    "Demographics - Gender (Other)",
-    "Model Fit - R²",
-    "Model Fit - Adjusted R²",
-    "Model Comparison - F-test"
-  ),
-  Result = c(
-    paste0("β = ", round(emo_coef, 4), ", p = ", round(emo_p, 4)),
-    paste0("β = ", round(coef(model_full)["age"], 4), 
-           ", p = ", round(summary(model_full)$coefficients["age", 4], 4)),
-    paste0("β = ", round(coef(model_full)["gender_male"], 4), 
-           ", p = ", round(summary(model_full)$coefficients["gender_male", 4], 4)),
-    paste0("β = ", round(coef(model_full)["gender_other"], 4), 
-           ", p = ", round(summary(model_full)$coefficients["gender_other", 4], 4)),
-    paste0(round(summary(model_full)$r.squared, 4)),
-    paste0(round(summary(model_full)$adj.r.squared, 4)),
-    paste0("F = ", round(compare_emo$F[2], 2), 
-           ", p = ", round(compare_emo$`Pr(>F)`[2], 4))
-  ),
-  Interpretation = c(
-    ifelse(emo_p < 0.05, "Significant", "Not significant"),
-    ifelse(summary(model_full)$coefficients["age", 4] < 0.05, "Significant", "Not significant"),
-    ifelse(summary(model_full)$coefficients["gender_male", 4] < 0.05, "Significant", "Not significant"),
-    ifelse(summary(model_full)$coefficients["gender_other", 4] < 0.05, "Significant", "Not significant"),
-    "Proportion of variance explained",
-    "Penalized for number of predictors",
-    ifelse(!is.na(compare_emo$`Pr(>F)`[2]) && compare_emo$`Pr(>F)`[2] < 0.05, 
-           "Emotion improves model", "Emotion doesn't improve model")
-  )
-)
-
-print(summary_table)
-
-cat("\n", rep("=", 80), "\n")
-cat("PART D COMPLETED\n")
-cat(rep("=", 80), "\n")
 

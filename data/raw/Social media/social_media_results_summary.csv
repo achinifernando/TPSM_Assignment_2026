@@ -1,0 +1,7 @@
+"","Test","Statistic","P_value","Significant"
+"1","Pearson Correlation","r = 0.016",0.5415,FALSE
+"2","T-test (High vs Low)","t = -0.943",0.3459,FALSE
+"3","Simple Regression","R² = 0",0.5415,FALSE
+"4","Regression with Controls","R² = 0.005",0.5686,FALSE
+"5","Gender Moderation","See by-gender table",NA,FALSE
+"6","Platform Moderation","See by-platform table",NA,FALSE

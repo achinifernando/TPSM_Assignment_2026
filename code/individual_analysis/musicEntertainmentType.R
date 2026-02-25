@@ -53,6 +53,7 @@ cat("Age range before:", min(music_data_clean$age), "to", max(music_data_clean$a
 music_data_clean <- music_data_clean[music_data_clean$age >= 10 & music_data_clean$age <= 90, ]
 cat("Age range after:", min(music_data_clean$age), "to", max(music_data_clean$age), "\n") #10 to 82
 
+
 # Convert categorical variables
 music_data_clean$gender <- factor(music_data_clean$gender,
                             levels = c(0,1),
@@ -94,6 +95,10 @@ summary(music_sample$age) # Min. 1st Qu.  Median    Mean 3rd Qu.    Max.
                           #11.00   23.00   29.00   32.16   39.00   82.00 
 cat("Mean age:", mean(music_sample$age), "\n") #32.15933 
 cat("SD age:", sd(music_sample$age), "\n") #12.35804
+
+#frequency table for age distribution
+age.freq <- table(music_sample$age_goup)
+age.freq
 
 # Age Histogram
 p_age <- ggplot(music_sample, aes(x = age)) +

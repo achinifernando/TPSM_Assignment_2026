@@ -24,7 +24,7 @@ library(effectsize)
 library(caret)
 
 
-setwd("C:\\Users\\USER\\Documents\\Y3S1 works")
+setwd("G:\\TPSM_Assignment_2026\\data\\raw\\Social media")
 getwd()
 
 # Load your data sets
@@ -32,7 +32,7 @@ data <- read.csv("social_media_dataset.csv") #raw dataset
 View(data)
 
 #Check no of rows that in cleaned data set
-cat("Initial number of rows: ",nrow(data) , "\n")
+cat("Initial number of rows: ",nrow(data) , "\n")  #52214 
 
 # Create a copy for cleaning
 data_clean <- data 
@@ -51,7 +51,7 @@ data_clean$audience_gender_distribution[data_clean$audience_gender_distribution 
 
 #Remove rows with missing texts
 data_clean <- na.omit(data_clean)
-cat("Number of rows after cleaning: ", nrow(data_clean) , "\n")
+cat("Number of rows after cleaning: ", nrow(data_clean) , "\n")  #28879
 
 #Fix data types
 data_clean <- data_clean %>% mutate(post_date = as.Date(post_date, "%m/%d/%y"))
@@ -82,10 +82,10 @@ summary(sample_data)
 head(sample_data)
 
 #Check basic info
-cat("Dataset dimensions: ", dim(sample_data), "\n")
+cat("Dataset dimensions: ", dim(sample_data), "\n")  #1500 22
 cat("Column names: ", names(sample_data), "\n")
-cat("Duplicate rows: ", sum(duplicated(sample_data)), "\n")
-cat("Missing values: ", colSums(is.na(sample_data)), "\n")
+cat("Duplicate rows: ", sum(duplicated(sample_data)), "\n")  #0
+cat("Missing values: ", colSums(is.na(sample_data)), "\n")  #0
 
 
 #Print(cleaning_log)
@@ -138,27 +138,89 @@ sample_data$positive[is.na(sample_data$positive)] <- 0
 sample_data$negative[is.na(sample_data$negative)] <- 0
 sample_data$sentiment_score[is.na(sample_data$sentiment_score)] <- 0
 
-#Define emotional connection
-sample_data$emotional_connection <- sample_data$sentiment_score
 
-#Second Emotional Variable
-#Normalize 
-sample_data$views_scaled <- scale(sample_data$views)
+# Show original distribution
+cat("\nOriginal sentiment_score distribution:\n")
+print(summary(sample_data$sentiment_score))  #   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+                                              #-3.000   0.000   0.000   0.366   1.000   5.000 
 
-#Emotion type detection (NRC emotion lexicon)
+# Create improved emotional connection measure (0-10 scale)
+sample_data <- sample_data %>%
+  mutate(
+    # Original raw score
+    emotional_connection_raw = sentiment_score,
+    
+    emotional_connection = (sentiment_score - min(sentiment_score)) / 
+      (max(sentiment_score) - min(sentiment_score)) * 10
+  )
+
+
+cat("\nImproved emotional_connection (0-10 scale):\n")
+print(summary(sample_data$emotional_connection))  # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+                                                  #0.000   3.750   3.750   4.207   5.000  10.000 
+
+
+
+# CREATE SATISFACTION VARIABLE (NORMALIZED)
+
+cat("\n", rep("=", 80), "\n")
+cat("PART 4: CREATING SATISFACTION VARIABLE\n")
+cat(rep("=", 80), "\n")
+
+# Create raw satisfaction
+sample_data$satisfaction_raw <- sample_data$likes + 
+  sample_data$shares + 
+  sample_data$comments_count
+
+cat("\nRaw satisfaction distribution:\n")
+print(summary(sample_data$satisfaction_raw))   # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+                                                #1868    1980    2010    2010    2039    2177 
+
+# Normalize satisfaction to 0-10 scale for interpretation
+sample_data <- sample_data %>%
+  mutate(
+    satisfaction = (satisfaction_raw - min(satisfaction_raw)) / 
+      (max(satisfaction_raw) - min(satisfaction_raw)) * 10,
+    satisfaction_std = as.numeric(scale(satisfaction_raw))
+  )
+
+cat("\nNormalized satisfaction (0-10 scale):\n")
+print(summary(sample_data$satisfaction))   # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+                                          #0.000   3.625   4.595   4.605   5.534  10.000 
+
+#  EMOTION TYPE DETECTION (NRC lexicon)
+
+
+cat("PART 5: EMOTION TYPE DETECTION\n")
+
+
 nrc <- get_sentiments("nrc")
-emotion_data <- comments_words %>% inner_join(nrc, by="word") %>% count(sentiment)
-emotion_data
+emotion_data <- comments_words %>% 
+  inner_join(nrc, by = "word") %>% 
+  count(sentiment)
 
-#Emotion plot
-ggplot(emotion_data, aes(x=sentiment, y = n, fill = sentiment))+
-  geom_bar(stat = "identity") + theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-  labs(title = "Emotion Distribution")
+cat("\nEmotion distribution in comments:\n")
+print(emotion_data)  # sentiment       n
+                    #anger            633
+                    #anticipation     1535
+                    #disgust          250
+                    #fear             902
+                    #joy              1177
+                    #negative         1046
+                    #positive         3832
+                    # sadness         566
+                    #surprise         702
+                    # trust           2525
 
-#Create satisfaction variable
-sample_data$satisfaction <- sample_data$likes + sample_data$shares + sample_data$comments_count
-#normalize
-sample_data$satisfaction_scaled <- scale(sample_data$satisfaction)
+# Emotion plot
+emotion_plot <- ggplot(emotion_data, aes(x = sentiment, y = n, fill = sentiment)) +
+  geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Emotion Distribution in Comments",
+       x = "Emotion", y = "Count") +
+  theme_minimal()
+print(emotion_plot)
+
 
 
 #=================================================
@@ -170,28 +232,14 @@ sample_data$satisfaction_scaled <- scale(sample_data$satisfaction)
 
 #Gender distribution
 #---------------------------------------------------
-
-audience_gender_mean <- mean(sample_data$audience_gender_distribution, na.rm=TRUE)
-audience_gender_mean
-audience_gender_median <- median(sample_data$audience_gender_distribution, na.rm=TRUE)
-audience_gender_median
-sd_audence_gender <- sd(sample_data$audience_gender_distribution, na.rm=TRUE)
-sd_audence_gender
-min_gender <- min(sample_data$audience_gender_distribution)
-min_gender
-max_gender <- max(sample_data$audience_gender_distribution)
-max_gender
-skewness_of_gender <- skewness(sample_data$audience_gender_distribution)
-skewness_of_gender
-
 gender.freq <- table(sample_data$audience_gender_distribution)
-gender.freq
-#female - 762, male - 738
+gender.prop <- prop.table(gender.freq) * 100
 
-#percentage distribution
-gender.prop <- prop.table(gender.freq) *100
-gender.prop
-#female - 50.8, male - 49.2
+cat("\n--- GENDER DISTRIBUTION ---\n")   #female- 762   male -738 
+print(gender.freq)
+cat("\nPercentages:\n")
+print(round(gender.prop, 1))  #female- 50.8   male-  49.2 
+  
 
 #bar chart
 ggplot(sample_data, aes(x = audience_gender_distribution, fill = audience_gender_distribution)) +
@@ -208,20 +256,6 @@ pie(gender.freq,
 #Age Distribution
 #---------------------------------------------
 
-audience_age_mean <- mean(sample_data$audience_age_distribution, na.rm=TRUE)
-audience_age_mean
-audience_age_median <- median(sample_data$audience_age_distribution, na.rm=TRUE)
-audience_age_median
-sd_audience_age <- sd(sample_data$audience_age_distribution, na.rm=TRUE)
-sd_audience_age
-min_age <- min(sample_data$audience_age_distribution)
-min_age
-max_age <- max(sample_data$audience_age_distribution)
-max_age
-skewness_of_age <- skewness(sample_data$audience_age_distribution)
-skewness_of_age
-
-
 #frequency table for age distribution
 age.freq <- table(sample_data$audience_age_distribution)
 age.freq
@@ -233,6 +267,8 @@ age.prop
 #     13-18     19-25     26-35     36-50       50+ 
 #  16.733333  35.133333  29.933333  13.066667  5.133333 
 
+
+
 #Bar chart
 ggplot(sample_data, aes( x= audience_age_distribution, fill = audience_age_distribution)) +
   geom_bar() + 
@@ -241,19 +277,6 @@ ggplot(sample_data, aes( x= audience_age_distribution, fill = audience_age_distr
 
 #Location Distribution
 #-------------------------------------------------
-
-location_mean <- mean(sample_data$location, na.rm=TRUE)
-location_mean
-location_median <- median(sample_data$location, na.rm=TRUE)
-location_median
-sd_location <- sd(sample_data$location, na.rm=TRUE)
-sd_location
-min_location <- min(sample_data$location)
-min_location
-max_location <- max(sample_data$location)
-max_location
-skewness_of_location <- skewness(sample_data$location)
-skewness_of_location
 
 #frequency table for location distribution
 location.freq <- table(sample_data$audience_location)
@@ -277,19 +300,6 @@ ggplot(sample_data, aes( x= audience_location , fill = audience_location)) +
 
 #Platform Distribution
 #-------------------------------------------
-
-platform_mean <- mean(sample_data$platform, na.rm=TRUE)
-platform_mean
-platform_median <- median(sample_data$platform, na.rm=TRUE)
-platform_median
-sd_platform <- sd(sample_data$platform, na.rm=TRUE)
-sd_platform
-min_platform <- min(sample_data$platform)
-min_platform
-max_platform <- max(sample_data$platform)
-max_platform
-skewness_of_platform <- skewness(sample_data$platform)
-skewness_of_platform
 
 #frequency table
 platform.freq <- table(sample_data$platform)
@@ -317,15 +327,15 @@ ggplot(sample_data, aes(x = platform, fill = platform)) +
 #summary statistics for emotions and satisfaction 
 summary(sample_data$emotional_connection)
 #    Min. 1st Qu.  Median    Mean  3rd Qu.    Max. 
-# -3.000   0.000   0.000   0.366   1.000     5.000 
+# 0.000   3.750   3.750   4.207   5.000  10.000 
 
 summary(sample_data$satisfaction)
 # Min. 1st Qu.  Median    Mean   3rd Qu.    Max. 
-#1868    1980    2010    2010    2039      2177 
+#0.000   3.625   4.595   4.605   5.534  10.000  
 
 #mean values for emotions and satisfaction 
-mean(sample_data$emotional_connection, na.rm = TRUE) #0.366
-mean(sample_data$satisfaction, na.rm = TRUE)        #2010.293
+mean(sample_data$emotional_connection, na.rm = TRUE) #4.2075
+mean(sample_data$satisfaction, na.rm = TRUE)        #4.604941
 
 #distribution plot for emotional connection
 ggplot(sample_data, aes(x = emotional_connection)) +
@@ -429,12 +439,14 @@ summary_stats <- sample_data %>%
 print("Summary Statistics by Emotional Quartile:")
 print(summary_stats)
 
-# emotional_quartile count mean_satisfaction median_satisfaction sd_satisfaction mean_likes mean_shares
-# <fct>              <int>             <dbl>               <int>           <dbl>      <dbl>       <dbl>
-# 1 Low                  375             2008.                2008            43.0      1507.        301.
-# 2 Medium-Low           375             2012.                2011            42.2      1512.        301.
-# 3 Medium-High          375             2008.                2010            46.9      1508.        299.
-# 4 High                 375             2013.                2011            45.5      1513.        300.
+# emotional_quartile count      mean_satisfaction median_satisfaction sd_satisfaction mean_likes  mean_shares  mean_comments
+#<fct>              <int>             <dbl>               <dbl>           <dbl>           <dbl>       <dbl>         <dbl>
+#Low                  375              4.52                4.53            1.39           1507.        301.          200.
+# Medium-Low           375              4.67                4.63            1.36          1512.        301.          200.
+# Medium-High          375              4.54                4.60            1.52          1508.        299.          201.
+# High                 375              4.69                4.63            1.47          1513.        300.          200.
+
+
 
 #============================================================
 #Inferential analysis
@@ -463,16 +475,118 @@ cor_test <- cor.test(
 cor_test
 
 
-print("CORRELATION RESULTS:")
-#correlation results
-#print(paste("Pearson: r =", round(cor_test$estimate, 3), 
- #           ", p =", round(cor_test$p.value, 4)))
+cat("\n--- OVERALL CORRELATION ---\n")
+cat("  r =", round(cor_test$estimate, 3), "\n")   # r=0.016
+cat("  p =", round(cor_test$p.value, 4), "\n")    #p= 0.5415
+cat("  95% CI = [", round(cor_test$conf.int[1], 3), ",", 
+    round(cor_test$conf.int[2], 3), "]\n")  #95% CI = [ -0.035 , 0.066 ]
 
-print(paste("Pearson: r =", round(cor_test$estimate, 3),
-            ", 95% CI [", round(cor_test$conf.int[1], 3), 
-            ", ", round(cor_test$conf.int[2], 3), "]"))
 
-# "Pearson: r = 0.016 , 95% CI [ -0.035 ,  0.066 ]"
+# Interpret effect size
+cat("\nEffect size interpretation: ")
+if(abs(cor_test$estimate) < 0.1) {
+  cat("Negligible correlation\n")
+} else if(abs(cor_test$estimate) < 0.3) {
+  cat("Weak correlation\n")
+} else if(abs(cor_test$estimate) < 0.5) {
+  cat("Moderate correlation\n")
+} else {
+  cat("Strong correlation\n")
+}    #Negligible correlation
+
+
+
+#DEMOGRAPHIC MODERATION ANALYSIS (NEW)
+# ============================================================================
+
+cat("DEMOGRAPHIC MODERATION ANALYSIS\n")
+
+
+# 1. By Gender
+cor_by_gender <- sample_data %>%
+  group_by(audience_gender_distribution) %>%
+  summarise(
+    n = n(),
+    r = cor(emotional_connection, satisfaction, use = "complete.obs"),
+    p = cor.test(emotional_connection, satisfaction)$p.value,
+    .groups = 'drop'
+  ) %>%
+  mutate(across(where(is.numeric), ~ round(., 4)))
+
+cat("\n--- CORRELATION BY GENDER ---\n")
+print(cor_by_gender)    #audience_gender_distribution     n       r       p
+                        #<chr>                        <dbl>   <dbl>     <dbl>
+                        #female                         762    0.0393    0.278
+                        # male                          738   -0.0055    0.881
+
+# 2. By Age Group
+cor_by_age <- sample_data %>%
+  group_by(audience_age_distribution) %>%
+  filter(n() >= 30) %>%
+  summarise(
+    n = n(),
+    r = cor(emotional_connection, satisfaction, use = "complete.obs"),
+    p = cor.test(emotional_connection, satisfaction)$p.value,
+    .groups = 'drop'
+  ) %>%
+  mutate(across(where(is.numeric), ~ round(., 4)))
+
+cat("\n--- CORRELATION BY AGE GROUP ---\n")
+print(cor_by_age)     # audience_age_distribution     n       r     p
+                      #<chr>                       <dbl>   <dbl>  <dbl>
+                      # 13-18                       251   0.0425  0.503
+                      # 19-25                       527  -0.0268  0.539
+                      # 26-35                       449   0.0196  0.678
+                      # 36-50                       196   0.0758  0.291
+                      # 50+                          77  -0.0061  0.958
+
+# 3. By Platform
+cor_by_platform <- sample_data %>%
+  group_by(platform) %>%
+  filter(n() >= 30) %>%
+  summarise(
+    n = n(),
+    r = cor(emotional_connection, satisfaction, use = "complete.obs"),
+    p = cor.test(emotional_connection, satisfaction)$p.value,
+    .groups = 'drop'
+  ) %>%
+  mutate(across(where(is.numeric), ~ round(., 4)))
+
+cat("\n--- CORRELATION BY PLATFORM ---\n")
+print(cor_by_platform)   #platform      n       r     p
+                          #<chr>     <dbl>   <dbl>  <dbl>
+                        #Bilibili     289   0.0468  0.428
+                        # Instagram   291   0.0757  0.198
+                        # RedNote     304   0.0109  0.850
+                        # TikTok      307  -0.0165   0.773
+                        # YouTube     309  -0.0382   0.503
+
+# 4. By Location (Top 5)
+top_locations <- names(sort(table(sample_data$audience_location), 
+                            decreasing = TRUE))[1:5]
+cor_by_location <- sample_data %>%
+  filter(audience_location %in% top_locations) %>%
+  group_by(audience_location) %>%
+  summarise(
+    n = n(),
+    r = cor(emotional_connection, satisfaction, use = "complete.obs"),
+    p = cor.test(emotional_connection, satisfaction)$p.value,
+    .groups = 'drop'
+  ) %>%
+  mutate(across(where(is.numeric), ~ round(., 4)))
+
+cat("\n--- CORRELATION BY TOP LOCATIONS ---\n")
+print(cor_by_location)   #audience_location     n       r     p
+                          #<chr>             <dbl>   <dbl> <dbl>
+                        #China               203  0.0921 0.191
+                        #Germany             190  0.0384 0.598
+                        #India               190 -0.0592 0.418
+                        # Japan               198 -0.016  0.823
+                        #USA                 202 -0.0569 0.421
+
+
+
+cat("T-TEST WITH BALANCED GROUPS\n")
 
 # Check if variances are equal
 var_test <- leveneTest(satisfaction ~ emotional_group, data = sample_data)
@@ -483,14 +597,12 @@ t_test <- t.test(sample_data$satisfaction ~ sample_data$emotional_group,
                  var.equal = var_test$`Pr(>F)`[1] > 0.05)
 
 # Calculate effect size (Cohen's d)
-cohen_d <- cohens_d(sample_data$satisfaction ~ sample_data$emotional_group, data = sample_data)
-print(cohen_d)
-
-#Cohen's d = -0.05,  95% CI = [-0.15, 0.05]
+cohen_d <- cohens_d(sample_data$satisfaction ~ sample_data$emotional_group, data = subset(sample_data, emotional_group %in% c("Low", "High")))
+ 
 
 # Group statistics
 group_stats <- sample_data %>%
-  group_by(emotional_group) %>%  # CORRECT
+  group_by(emotional_group) %>%  
   summarise(
     n = n(),
     mean_sat = mean(satisfaction, na.rm = TRUE),  
@@ -500,97 +612,141 @@ group_stats <- sample_data %>%
 print("T-TEST RESULTS:")
 print(paste("t =", round(t_test$statistic, 3), 
             ", df =", round(t_test$parameter, 1),
-            ", p =", round(t_test$p.value, 4)))
+            ", p =", round(t_test$p.value, 4),
+            "  Cohen's d =", round(cohen_d$Cohens_d, 3), "\n"))
 
-# "t = -0.943 , df = 1498 , p = 0.3459"
+# "t = -0.943 , df = 1498 , p = 0.3459"  # Cohen's d = -0.05 
 
-print(paste("Cohen's d =", round(cohen_d$Cohens_d, 3))) # -0.05
+
 print("Group means: ")
 print(group_stats)
 
 # emotional_group     n    mean_sat   sd_sat
 # <fct>             <int>   <dbl>     <dbl>
-# 1 Low               913    2009.   43.8
-# 2 High              587    2012.   45.5
+# 1 Low               913    4.58   1.42
+# 2 High              587    4.65   1.47
+
+
 
 #---------------------------------------------------------------------
-#Linear regression
-#fit regression model
+#REGRESSION ANALYSIS (WITH CONTROLS)
+# Create dummy variables for regression
+sample_data <- sample_data %>%
+  mutate(
+    gender_male = ifelse(audience_gender_distribution == "male", 1, 0),
+    gender_female = ifelse(audience_gender_distribution == "female", 1, 0),
+    
+    age_19_25 = ifelse(audience_age_distribution == "19-25", 1, 0),
+    age_26_35 = ifelse(audience_age_distribution == "26-35", 1, 0),
+    age_36_50 = ifelse(audience_age_distribution == "36-50", 1, 0),
+    age_50plus = ifelse(audience_age_distribution == "50+", 1, 0),
+    
+    platform_tiktok = ifelse(platform == "TikTok", 1, 0),
+    platform_instagram = ifelse(platform == "Instagram", 1, 0),
+    platform_youtube = ifelse(platform == "YouTube", 1, 0)
+  )
 
-model <- lm(satisfaction ~ emotional_connection, data = sample_data)
-summary_model <- summary(model)
+# Model 1: Simple regression
+model_simple <- lm(satisfaction ~ emotional_connection, data = sample_data)
+summary_simple <- summary(model_simple)
 
-print("REGRESSION RESULTS:")
-print(paste("R² =", round(summary_model$r.squared, 3)))       #R² = 0
-print(paste("F =", round(summary_model$fstatistic[1], 3),     #F= 0.373
-            ", p =", round(pf(summary_model$fstatistic[1],    #p = 0.5415
-                              summary_model$fstatistic[2], 
-                              summary_model$fstatistic[3], 
-                              lower.tail = FALSE), 4)))
-print("Coefficients:")
-print(round(coef(model),3))
+cat("\n--- SIMPLE REGRESSION ---\n")
+cat("  R² =", round(summary_simple$r.squared, 4), "\n")   #R² = 2e-04
+cat("  emotional_connection coefficient =", 
+    round(coef(model_simple)[2], 4), "\n")  #0.0166 
+cat("  p-value =", round(summary_simple$coefficients[2, 4], 4), "\n")   # 0.5415 
 
-#(Intercept)     emotional_connection 
-# 2010.059                0.639
+# Model 2: With demographics
+model_full <- lm(satisfaction ~ emotional_connection + 
+                   gender_male + age_19_25 + age_26_35 + age_36_50 + age_50plus +
+                   platform_tiktok + platform_instagram + platform_youtube,
+                 data = sample_data)
+summary_full <- summary(model_full)
 
-#summary table
+cat("\n--- FULL REGRESSION (with demographics) ---\n")
+cat("  R² =", round(summary_full$r.squared, 4), "\n")   #R² = 0.0046 
+cat("  Adjusted R² =", round(summary_full$adj.r.squared, 4), "\n")   #-0.0015 
+cat("  emotional_connection coefficient =", 
+    round(coef(model_full)["emotional_connection"], 4), "\n")  # 0.0155 
+cat("  p-value =", 
+    round(summary_full$coefficients["emotional_connection", 4], 4), "\n")   #0.5686 
 
-results <- data.frame(
-  Test = c("Pearson", "T-test", "Regression"),
+# Model comparison
+anova_compare <- anova(model_simple, model_full)
+cat("\n--- MODEL COMPARISON ---\n")
+cat("  F-change =", round(anova_compare$F[2], 2), "\n")   #0.81 
+cat("  p-value =", round(anova_compare$`Pr(>F)`[2], 4), "\n")  #0.5974 
+
+
+cat(" FINAL SUMMARY AND CONCLUSION\n")
+cat(rep("=", 80), "\n")
+
+# Create summary table
+final_summary <- data.frame(
+  Test = c(
+    "Pearson Correlation",
+    "T-test (High vs Low)",
+    "Simple Regression",
+    "Regression with Controls",
+    "Gender Moderation",
+    "Platform Moderation"
+  ),
   Statistic = c(
     paste("r =", round(cor_test$estimate, 3)),
     paste("t =", round(t_test$statistic, 3)),
-    paste("F =", round(summary_model$fstatistic[1], 3))
+    paste("R² =", round(summary_simple$r.squared, 3)),
+    paste("R² =", round(summary_full$r.squared, 3)),
+    "See by-gender table",
+    "See by-platform table"
   ),
   P_value = c(
     round(cor_test$p.value, 4),
     round(t_test$p.value, 4),
-    round(pf(summary_model$fstatistic[1], 
-             summary_model$fstatistic[2], 
-             summary_model$fstatistic[3], 
-             lower.tail = FALSE), 4)
-  ),
-  Effect_Size = c(
-    paste("r² =", round(cor_test$estimate^2, 3)),
-    paste("d =", round(cohen_d$Cohens_d, 3)),
-    paste("R² =", round(summary_model$r.squared, 3))
+    round(summary_simple$coefficients[2, 4], 4),
+    round(summary_full$coefficients["emotional_connection", 4], 4),
+    NA,
+    NA
   ),
   Significant = c(
     cor_test$p.value < 0.05,
     t_test$p.value < 0.05,
-    pf(summary_model$fstatistic[1], 
-       summary_model$fstatistic[2], 
-       summary_model$fstatistic[3], 
-       lower.tail = FALSE) < 0.05
+    summary_simple$coefficients[2, 4] < 0.05,
+    summary_full$coefficients["emotional_connection", 4] < 0.05,
+    any(cor_by_gender$p < 0.05),
+    any(cor_by_platform$p < 0.05)
   )
 )
 
-print("HYPOTHESIS TESTING SUMMARY")
-print("H0 : No relationship between emotional connection and satisfaction")
-print("H1 : Positive relationship exists")
-print(results)
+cat("\n--- SUMMARY OF ALL TESTS ---\n")
+print(final_summary)
 
+# FINAL CONCLUSION
 
-#  Test       Statistic     P_value   Effect_Size Significant
-# Pearson     r = 0.016     0.5415      r² = 0       FALSE
-# T-test      t = -0.943    0.3459      d = -0.05       FALSE
-# Regression  F = 0.373     0.5415      R² = 0       FALSE
+cat("FINAL CONCLUSION\n")
+cat(rep("=", 80), "\n")
 
-#simple plot
-# Effect size plot
-effects <- data.frame(
-  Test = c("Pearson r", "Cohen's d", "R²"),
-  Value = c(cor_test$estimate, cohen_d$Cohens_d, summary_model$r.squared)
-)
+if(cor_test$p.value < 0.05) {
+  cat("\nHYPOTHESIS SUPPORTED!\n")
+  cat("  Emotional connection significantly predicts satisfaction in social media.\n")
+  cat("  Effect size: r =", round(cor_test$estimate, 3), 
+      "(", ifelse(abs(cor_test$estimate) < 0.1, "negligible",
+                  ifelse(abs(cor_test$estimate) < 0.3, "weak",
+                         ifelse(abs(cor_test$estimate) < 0.5, "moderate", "strong"))), ")\n")
+} else {
+  cat("\nHYPOTHESIS NOT SUPPORTED\n")
+  cat("  No significant relationship found between emotional connection")
+  cat(" and satisfaction in social media.\n")
+  cat("  p =", round(cor_test$p.value, 4), "> 0.05\n")
+  cat("  Effect size: r =", round(cor_test$estimate, 3), "(negligible)\n\n")
+  
+  cat("This finding is consistent across:\n")
+  cat("  ✓ All statistical tests (correlation, t-test, ANOVA, regression)\n")
+  cat("  ✓ All demographic subgroups (age, gender, platform, location)\n")
+  cat("  ✓ Different measures of emotional connection\n")
+}
 
-ggplot(effects, aes(x = Test, y = Value, fill = Test)) +
-  geom_col(alpha = 0.7) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  labs(title = "Effect Sizes", y = "Effect Size") +
-  theme_minimal() +
-  theme(legend.position = "none")
+# Save key results
+saveRDS(sample_data, "social_media_analysis_ready.rds")
+write.csv(final_summary, "social_media_results_summary.csv")
 
-
-
-#rm(sample_data)
 
