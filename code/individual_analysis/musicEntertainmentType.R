@@ -13,10 +13,6 @@
 # 4. Analytics covered: Descriptive, Inferential
 # ============================================================================
 
-# Clear environment
-rm(list = ls())
-cat("\014")
-
 library(dplyr)      # Data manipulation
 library(ggplot2)    # Visualization
 
@@ -207,15 +203,34 @@ ggsave("boxplot_emotion.png",
 # Satisfaction 
 cat("Overall satisfaction rate:", mean(music_sample$liked) * 100, "%\n") #41.06667 %
 
-# Summary Table
-summary_table <- data.frame(
-  Variable = c("Age", "Emotional Intensity (0-5 scale)", "Liked (binary)"),
-  Mean = c(mean(music_sample$age), mean(music_sample$emotional_intensity), mean(music_sample$liked)),
-  SD = c(sd(music_sample$age), sd(music_sample$emotional_intensity), sd(music_sample$liked)),
-  Min = c(min(music_sample$age), min(music_sample$emotional_intensity), min(music_sample$liked)),
-  Max = c(max(music_sample$age), max(music_sample$emotional_intensity), max(music_sample$liked))
-)
-write.csv(summary_table, "music_descriptive_summary_table.csv", row.names = FALSE)
+# Emotional Intensity vs Liked (Satisfaction) - Quartile-based Emotional Intensity Analysis 
+# Divide sample into 4 quartiles of emotional intensity
+music_sample <- music_sample %>%
+  mutate(emotion_quartile = ntile(emotional_intensity, 4))  # Q1–Q4
+
+# Summarize satisfaction (liked) by quartile
+satisfaction_by_quartile <- music_sample %>%
+  group_by(emotion_quartile) %>%
+  summarise(
+    Satisfaction_Rate = mean(liked) * 100,  # % of liked
+    Count = n()
+  )
+
+print(satisfaction_by_quartile)
+
+# Bar plot of satisfaction rate by emotional intensity quartile
+p_quartile <- ggplot(satisfaction_by_quartile, aes(x = factor(emotion_quartile),
+                                                   y = Satisfaction_Rate)) +
+  geom_bar(stat = "identity", fill = "#FF7F50") +
+  geom_text(aes(label = paste0(round(Satisfaction_Rate,1), "%")), 
+            vjust = -0.5, size = 4) +
+  labs(title = "Satisfaction by Emotional Intensity Quartiles",
+       x = "Emotional Intensity Quartile (Q1 = lowest, Q4 = highest)",
+       y = "Satisfaction Rate (%)") +
+  theme_minimal() +
+  ylim(0, 100)
+
+ggsave("satisfaction_by_quartile.png", p_quartile, width = 7, height = 5)
 
 # ----- Combined Summary Table -----
 # Numerical
@@ -269,6 +284,3 @@ categorical_summary <- data.frame(
 # Combine both
 combined_summary <- rbind(numerical_summary, categorical_summary)
 write.csv(combined_summary, "music_descriptive_combined_summary.csv", row.names = FALSE)
-
-# =================================================================================================
-
