@@ -1,0 +1,14 @@
+"Variable","Category","Count","Percentage"
+"Gender","Male",808,53.87
+"Gender","Female",692,46.13
+"Age Group","0-12",6,0.4
+"Age Group","13-18",124,8.27
+"Age Group","19-25",476,31.73
+"Age Group","26-35",454,30.27
+"Age Group","36-50",288,19.2
+"Age Group","50+",152,10.13
+"Emotion Direction","Negative",199,13.27
+"Emotion Direction","Neutral/Mixed",157,10.47
+"Emotion Direction","Positive",1144,76.27
+"Satisfaction","Not Liked",476,31.73
+"Satisfaction","Liked",1024,68.27

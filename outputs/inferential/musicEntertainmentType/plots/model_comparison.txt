@@ -1,0 +1,8 @@
+MODEL COMPARISON: Simple vs Multiple Regression
+Analysis of Variance Table
+
+Model 1: liked ~ emotional_intensity
+Model 2: liked ~ emotional_intensity + age + gender
+  Res.Df    RSS Df Sum of Sq      F Pr(>F)
+1   1498 309.98                           
+2   1496 309.60  2   0.37637 0.9093  0.403

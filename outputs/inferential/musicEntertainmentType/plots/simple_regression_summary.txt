@@ -1,0 +1,20 @@
+SIMPLE LINEAR REGRESSION
+
+Call:
+lm(formula = liked ~ emotional_intensity, data = sample_data)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-0.7998 -0.5660  0.2002  0.3171  0.5510 
+
+Coefficients:
+                    Estimate Std. Error t value Pr(>|t|)    
+(Intercept)          0.44902    0.02987  15.032   <2e-16 ***
+emotional_intensity  0.11694    0.01375   8.507   <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4549 on 1498 degrees of freedom
+Multiple R-squared:  0.04608,	Adjusted R-squared:  0.04544 
+F-statistic: 72.36 on 1 and 1498 DF,  p-value: < 2.2e-16
+

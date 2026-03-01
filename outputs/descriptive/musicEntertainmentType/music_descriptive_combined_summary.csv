@@ -1,7 +1,0 @@
-"Variable","Type","Category","Count_Mean","Percent_SD","Min","Max"
-"Age","Numerical",NA,"32.16","12.36",11,82
-"Emotional Intensity","Numerical",NA,"2","0.84",0,5
-"Liked","Numerical",NA,"0.41","0.49",0,1
-"Gender","Categorical","Male / Female","815 / 685","54.3 / 45.7",NA,NA
-"Genre","Categorical","classical / electronic / pop / rock","480 / 341 / 319 / 360","32 / 22.7 / 21.3 / 24",NA,NA
-"Mother Tongue","Categorical","Top 5 + Other","English: 514 / Dutch: 310 / Russian: 284 / German: 72 / French: 38 / Other: 282","English34.3% / Dutch20.7% / Russian18.9% / German4.8% / French2.5% / Other18.8%",NA,NA
