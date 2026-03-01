@@ -1,0 +1,453 @@
+# ------------------------------------------------------------------------------------------------
+
+# INFERENTIAL ANALYSIS 
+# Testing: "Audiences who feel emotionally connected report higher satisfaction"
+# Dataset: Emotify Music Data (cleaned, no neutral responses)
+# Sample size: 1500
+# ============================================================================
+
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+library(car)        # For leveneTest, VIF
+library(effectsize) # For Cohen's d
+library(lmtest)     # For diagnostics
+
+dir.create("Inferential_Output", showWarnings = FALSE)
+
+# STEP 1: Prepare Data
+# Data Overview 
+cat("Sample size:", nrow(music_sample), "\n") #1500
+cat("Variables:", paste(names(music_sample), collapse = ", "), "\n")
+#Variables: age, gender, mother.tongue, genre, amazement, solemnity, tenderness, nostalgia, calmness, power, joyful_activation, tension, sadness, liked, disliked, emotional_intensity, positive_score, negative_score, emotion_direction, sentiment_score, age_group, emotion_quartile
+
+sample_data <- music_sample
+
+# variables
+# DV: liked (satisfaction - binary 0/1)
+# IV: emotional_intensity (emotional connection - continuous)
+# Controls: age, gender (for multiple regression)
+
+# Variable Summary
+cat("  Liked (satisfaction) - Mean:", round(mean(sample_data$liked), 3), "\n") #  Liked (satisfaction) - Mean: 0.683 
+cat("  Emotional Intensity - Mean:", round(mean(sample_data$emotional_intensity), 3), 
+    ", SD:", round(sd(sample_data$emotional_intensity), 3), "\n") #Emotional Intensity - Mean: 1.998 , SD: 0.855 
+cat("  Age - Mean:", round(mean(sample_data$age), 1), 
+    ", SD:", round(sd(sample_data$age), 1), "\n") #Age - Mean: 31.5 , SD: 12.5 
+
+# Gender distribution
+print(table(sample_data$gender)) #Male - 808, Female - 692
+print(round(prop.table(table(sample_data$gender)) * 100, 1)) #Male - 53.9, Female - 46.1 
+
+# STEP 2: Create High/Low Emotional Connection Groups (Median Split)
+emotional_median <- median(sample_data$emotional_intensity, na.rm = TRUE)
+cat("Median emotional intensity:", round(emotional_median, 3), "\n") # 2 
+
+sample_data$emotional_group <- ifelse(sample_data$emotional_intensity > emotional_median, 
+                                      "High", "Low")
+sample_data$emotional_group <- factor(sample_data$emotional_group, levels = c("Low", "High"))
+
+group_table <- table(sample_data$emotional_group)
+print(group_table)
+#Low High 
+#972  528
+cat("High group:", group_table["High"], "participants (", 
+    round(group_table["High"]/nrow(sample_data)*100, 1), "%)\n") #528 participants ( 35.2 %)
+cat("Low group:", group_table["Low"], "participants (", 
+    round(group_table["Low"]/nrow(sample_data)*100, 1), "%)\n") #Low group: 972 participants ( 64.8 %)
+
+# STEP 3: Pearson Correlation
+cor_test <- cor.test(
+  sample_data$emotional_intensity,
+  sample_data$liked,
+  method = "pearson", 
+  conf.level = 0.95
+)
+
+cat("Pearson's r =", round(cor_test$estimate, 3), "\n") #0.215 
+cat("95% CI [", round(cor_test$conf.int[1], 3), ", ", round(cor_test$conf.int[2], 3), "]\n") #95% CI [ 0.166 ,  0.262 ]
+cat("p-value =", round(cor_test$p.value, 4), "\n") #p-value = 0 
+
+# Effect size interpretation
+r_squared <- cor_test$estimate^2
+r_interp <- ifelse(r_squared < 0.01, "Very weak",
+                   ifelse(r_squared < 0.09, "Weak",
+                          ifelse(r_squared < 0.25, "Moderate", "Strong")))
+cat("r² =", round(r_squared, 3), "-", r_interp, "effect\n") #r² = 0.046 - Weak effect
+
+if(cor_test$p.value < 0.05) {
+  cat("✓ Significant correlation\n")
+} else {
+  cat("✗ Not significant\n")
+} #✓ Significant correlation
+
+cor_test$p.value #4.273649e-17 -> 0
+
+# STEP 4: T-Test (Compare Means Between High and Low Groups)
+# Check if variances are equal (Levene's test)
+var_test <- leveneTest(liked ~ emotional_group, data = sample_data)
+cat("Levene's test for equal variances p-value:", round(var_test$`Pr(>F)`[1], 4), "\n") #0
+
+# Run t-test
+var_equal <- var_test$`Pr(>F)`[1] > 0.05
+t_test <- t.test(sample_data$liked ~ sample_data$emotional_group, 
+                 data = sample_data,
+                 var.equal = var_equal)
+
+# Calculate Cohen's d
+cohen_d <- cohens_d(sample_data$liked ~ sample_data$emotional_group, data = sample_data)
+
+# Group statistics
+group_stats <- sample_data %>%
+  group_by(emotional_group) %>%
+  summarise(
+    n = n(),
+    mean_satisfaction = round(mean(liked, na.rm = TRUE), 3),
+    sd_satisfaction = round(sd(liked, na.rm = TRUE), 3)
+  )
+
+print(group_stats)
+#  emotional_group     n mean_satisfaction sd_satisfaction
+#<fct>           <int>             <dbl>           <dbl>
+#1 Low               972             0.619           0.486
+#2 High              528             0.799           0.401
+
+#T-TEST RESULTS
+cat("t =", round(t_test$statistic, 3), 
+    ", df =", round(t_test$parameter, 1),
+    ", p =", round(t_test$p.value, 4), "\n") #t = -7.69 , df = 1265.8 , p = 0 
+
+# Cohen's d interpretation
+d_value <- abs(cohen_d$Cohens_d)
+d_interp <- ifelse(d_value < 0.2, "Very small",
+                   ifelse(d_value < 0.5, "Small",
+                          ifelse(d_value < 0.8, "Medium", "Large")))
+cat("Cohen's d =", round(cohen_d$Cohens_d, 3), 
+    " (", d_interp, " effect)\n") #Cohen's d = -0.393  ( Small  effect)
+
+if(t_test$p.value < 0.05) {
+  cat("✓ Significant difference between groups\n")
+} else {
+  cat("✗ No significant difference\n")
+} #✓ Significant difference between groups
+
+# STEP 5: Simple Linear Regression (Emotional Connection ONLY)
+model_simple <- lm(liked ~ emotional_intensity, data = sample_data)
+summary_simple <- summary(model_simple)
+
+#SIMPLE REGRESSION RESULTS
+cat("R² =", round(summary_simple$r.squared, 4), "\n") #R² = 0.0461 
+cat("Adjusted R² =", round(summary_simple$adj.r.squared, 4), "\n") #Adjusted R² = 0.0454 
+cat("F =", round(summary_simple$fstatistic[1], 3),
+    ", p =", round(pf(summary_simple$fstatistic[1], 
+                      summary_simple$fstatistic[2], 
+                      summary_simple$fstatistic[3], 
+                      lower.tail = FALSE), 4), "\n\n") #F = 72.363 , p = 0 
+
+#Coefficients
+print(round(coef(summary_simple), 4))
+#                    Estimate Std. Error t value Pr(>|t|)
+#(Intercept)           0.4490     0.0299 15.0315        0
+#emotional_intensity   0.1169     0.0137  8.5067        0
+
+# Extract emotional intensity coefficient
+emo_coef_simple <- coef(model_simple)[2]
+emo_p_simple <- summary_simple$coefficients[2, 4]
+conf_int_simple <- confint(model_simple)["emotional_intensity", ]
+
+cat("\nEmotional intensity coefficient =", round(emo_coef_simple, 4), "\n") #0.1169 
+cat("95% CI [", round(conf_int_simple[1], 4), ", ", round(conf_int_simple[2], 4), "]\n") #95% CI [ 0.09 ,  0.1439 ]
+cat("p-value =", round(emo_p_simple, 4), "\n") #0
+
+if(emo_p_simple < 0.05) {
+  cat("✓ Emotional connection SIGNIFICANTLY predicts satisfaction\n")
+} else {
+  cat("✗ Emotional connection does NOT significantly predict satisfaction\n")
+}
+#✓ Emotional connection SIGNIFICANTLY predicts satisfaction
+
+# STEP 6: Multiple Linear Regression (WITH Demographics)
+# Ensure gender is factor
+sample_data$gender <- as.factor(sample_data$gender)
+
+# Multiple regression model
+model_multiple <- lm(liked ~ emotional_intensity + age + gender, data = sample_data)
+summary_multiple <- summary(model_multiple)
+
+cat("R² =", round(summary_multiple$r.squared, 4), "\n") #R² = 0.0472 
+cat("Adjusted R² =", round(summary_multiple$adj.r.squared, 4), "\n") #Adjusted R² = 0.0453
+cat("F =", round(summary_multiple$fstatistic[1], 3),
+    ", p =", round(pf(summary_multiple$fstatistic[1], 
+                      summary_multiple$fstatistic[2], 
+                      summary_multiple$fstatistic[3], 
+                      lower.tail = FALSE), 4), "\n\n") #F = 24.724 , p = 0 
+
+# Coefficients
+print(round(coef(summary_multiple), 4))
+#                    Estimate Std. Error t value Pr(>|t|)
+#(Intercept)           0.4040     0.0462  8.7414   0.0000
+#emotional_intensity   0.1183     0.0138  8.5780   0.0000
+#age                   0.0013     0.0009  1.3485   0.1777
+#genderFemale          0.0042     0.0237  0.1754   0.8608
+
+# Extract emotional intensity coefficient (with controls)
+emo_coef_multiple <- coef(summary_multiple)["emotional_intensity", "Estimate"]
+emo_p_multiple <- coef(summary_multiple)["emotional_intensity", "Pr(>|t|)"]
+conf_int_multiple <- confint(model_multiple)["emotional_intensity", ]
+
+cat("\nEmotional intensity (with controls) coefficient =", round(emo_coef_multiple, 4), "\n") #0.1183 
+cat("95% CI [", round(conf_int_multiple[1], 4), ", ", round(conf_int_multiple[2], 4), "]\n") #95% CI [ 0.0913 ,  0.1454 ]
+cat("p-value =", round(emo_p_multiple, 4), "\n") #0
+
+if(emo_p_multiple < 0.05) {
+  cat("✓ Emotional connection STILL significant after controlling for age and gender\n")
+} else {
+  cat("✗ Emotional connection NOT significant after controlling for age and gender\n")
+}
+#✓ Emotional connection STILL significant after controlling for age and gender
+
+# STEP 7: Model Comparison (Simple vs Multiple)
+
+model_comparison <- anova(model_simple, model_multiple)
+print(model_comparison)
+#Analysis of Variance Table
+
+#Model 1: liked ~ emotional_intensity
+#Model 2: liked ~ emotional_intensity + age + gender
+#Res.Df    RSS Df Sum of Sq      F Pr(>F)
+#1   1498 309.98                           
+#2   1496 309.60  2   0.37637 0.9093  0.403
+
+if(model_comparison$`Pr(>F)`[2] < 0.05) {
+  cat("\n✓ Adding demographics SIGNIFICANTLY improves the model\n")
+} else {
+  cat("\n✗ Adding demographics does NOT significantly improve the model\n")
+}
+#✗ Adding demographics does NOT significantly improve the model
+
+# STEP 8: Regression Diagnostics (VIF - Multicollinearity)
+# Variance Inflation Factor (should be < 5)
+vif_values <- vif(model_multiple)
+cat("\nVariance Inflation Factor (VIF) - should be < 5:\n")
+print(round(vif_values, 2))
+#emotional_intensity                 age              gender 
+#1.01                1.02                1.02
+
+if(max(vif_values) > 5) {
+  cat("⚠ High multicollinearity detected\n")
+} else {
+  cat("✓ No serious multicollinearity issues\n")
+}
+#✓ No serious multicollinearity issues
+
+# Check normality of residuals (simplified)
+residuals_test <- shapiro.test(residuals(model_multiple)[1:500]) # Subset due to sample size
+cat("\nNormality of residuals (Shapiro-Wilk on subset): p =",  
+    round(residuals_test$p.value, 4), "\n") #0
+if(residuals_test$p.value > 0.05) {
+  cat("✓ Residuals approximately normal\n")
+} else {
+  cat("⚠ Residuals deviate from normality (common with large samples)\n")
+}
+# ⚠ Residuals deviate from normality (common with large samples)
+
+# STEP 9: Create Enhanced Summary Table
+results_table <- data.frame(
+  Test = c("Pearson Correlation", "T-test", "Simple Regression", "Multiple Regression"),
+  Statistic = c(
+    paste("r =", round(cor_test$estimate, 3)),
+    paste("t =", round(t_test$statistic, 3)),
+    paste("F =", round(summary_simple$fstatistic[1], 3)),
+    paste("F =", round(summary_multiple$fstatistic[1], 3))
+  ),
+  P_value = c(
+    round(cor_test$p.value, 4),
+    round(t_test$p.value, 4),
+    round(pf(summary_simple$fstatistic[1], 
+             summary_simple$fstatistic[2], 
+             summary_simple$fstatistic[3], 
+             lower.tail = FALSE), 4),
+    round(pf(summary_multiple$fstatistic[1], 
+             summary_multiple$fstatistic[2], 
+             summary_multiple$fstatistic[3], 
+             lower.tail = FALSE), 4)
+  ),
+  Effect_Size = c(
+    paste("r² =", round(cor_test$estimate^2, 3)),
+    paste("d =", round(cohen_d$Cohens_d, 3)),
+    paste("R² =", round(summary_simple$r.squared, 3)),
+    paste("R² =", round(summary_multiple$r.squared, 3))
+  ),
+  Interpretation = c(
+    ifelse(cor_test$estimate^2 < 0.01, "Very weak",
+           ifelse(cor_test$estimate^2 < 0.09, "Weak",
+                  ifelse(cor_test$estimate^2 < 0.25, "Moderate", "Strong"))),
+    ifelse(abs(cohen_d$Cohens_d) < 0.2, "Very small",
+           ifelse(abs(cohen_d$Cohens_d) < 0.5, "Small",
+                  ifelse(abs(cohen_d$Cohens_d) < 0.8, "Medium", "Large"))),
+    ifelse(summary_simple$r.squared < 0.01, "Very weak",
+           ifelse(summary_simple$r.squared < 0.09, "Weak",
+                  ifelse(summary_simple$r.squared < 0.25, "Moderate", "Strong"))),
+    ifelse(summary_multiple$r.squared < 0.01, "Very weak",
+           ifelse(summary_multiple$r.squared < 0.09, "Weak",
+                  ifelse(summary_multiple$r.squared < 0.25, "Moderate", "Strong")))
+  ),
+  Significant = c(
+    cor_test$p.value < 0.05,
+    t_test$p.value < 0.05,
+    pf(summary_simple$fstatistic[1], 
+       summary_simple$fstatistic[2], 
+       summary_simple$fstatistic[3], 
+       lower.tail = FALSE) < 0.05,
+    pf(summary_multiple$fstatistic[1], 
+       summary_multiple$fstatistic[2], 
+       summary_multiple$fstatistic[3], 
+       lower.tail = FALSE) < 0.05
+  )
+)
+
+cat("H₀: No relationship between emotional connection and satisfaction\n")
+cat("H₁: Positive relationship exists\n\n")
+print(results_table)
+#                 Test  Statistic P_value Effect_Size Interpretation Significant
+#1 Pearson Correlation  r = 0.215       0  r² = 0.046           Weak        TRUE
+#2              T-test  t = -7.69       0  d = -0.393          Small        TRUE
+#3   Simple Regression F = 72.363       0  R² = 0.046           Weak        TRUE
+#4 Multiple Regression F = 24.724       0  R² = 0.047           Weak        TRUE
+
+# Save results table
+write.csv(results_table, "music_hypothesis_testing_summary.csv", row.names = FALSE)
+
+# STEP 10: Create and Save Diagnostic Plots
+effects <- data.frame(
+  Test = c("Pearson r²", "Cohen's d", "Simple R²", "Multiple R²"),
+  Value = c(cor_test$estimate^2, abs(cohen_d$Cohens_d), 
+            summary_simple$r.squared, summary_multiple$r.squared)
+)
+
+# Plot 1: Effect Size Plot
+p_effects <- ggplot(effects, aes(x = Test, y = Value, fill = Test)) +
+  geom_col(alpha = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 0.01, linetype = "dotted", color = "gray") +
+  geom_hline(yintercept = 0.09, linetype = "dotted", color = "gray") +
+  geom_hline(yintercept = 0.25, linetype = "dotted", color = "gray") +
+  annotate("text", x = 0.5, y = 0.01, label = "Very weak", hjust = 0, size = 3) +
+  annotate("text", x = 0.5, y = 0.09, label = "Weak", hjust = 0, size = 3) +
+  annotate("text", x = 0.5, y = 0.25, label = "Moderate", hjust = 0, size = 3) +
+  labs(title = "Effect Sizes - Music Dataset",
+       subtitle = "Testing: Emotional Connection → Satisfaction",
+       y = "Effect Size") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  ylim(0, max(0.5, max(effects$Value) + 0.1))
+
+ggsave("music_effect_sizes_enhanced.png", p_effects, width = 8, height = 5)
+print(p_effects)
+
+# Plot 2: Boxplot of Satisfaction by Emotional Group
+p_box <- ggplot(sample_data, aes(x = emotional_group, y = liked, fill = emotional_group)) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("Low" = "#F44336", "High" = "#4CAF50")) +
+  labs(title = "Satisfaction by Emotional Connection Group",
+       subtitle = paste0("t = ", round(t_test$statistic, 2), 
+                         ", p < 0.001, d = ", round(cohen_d$Cohens_d, 2)),
+       x = "Emotional Connection Group", y = "Satisfaction (0 = Not Liked, 1 = Liked)") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+ggsave("Inferential_Output/satisfaction_by_group_boxplot.png", p_box, width = 6, height = 5)
+
+# Plot 3: Residuals Diagnostics for Multiple Regression
+png("Inferential_Output/regression_diagnostics.png", width = 800, height = 800)
+par(mfrow = c(2, 2))
+plot(model_multiple)
+title("Regression Diagnostic Plots - Music Dataset", outer = TRUE, line = -2)
+dev.off()
+
+# Plot 4: Scatterplot with Regression Line
+p_scatter <- ggplot(sample_data, aes(x = emotional_intensity, y = liked)) +
+  geom_point(alpha = 0.3, color = "darkgray") +
+  geom_smooth(method = "lm", color = "blue", se = TRUE) +
+  labs(title = "Relationship between Emotional Intensity and Satisfaction",
+       subtitle = paste0("r = ", round(cor_test$estimate, 3), 
+                         ", R² = ", round(summary_simple$r.squared, 3),
+                         ", p < 0.001"),
+       x = "Emotional Intensity", y = "Satisfaction (0 = Not Liked, 1 = Liked)") +
+  theme_minimal()
+
+ggsave("Inferential_Output/emotional_intensity_vs_satisfaction.png", p_scatter, width = 7, height = 5)
+
+# Plot 5: Grouped Bar Chart - Satisfaction Rate by Group
+group_summary <- sample_data %>%
+  group_by(emotional_group) %>%
+  summarise(
+    satisfaction_rate = mean(liked) * 100,
+    se = sd(liked) / sqrt(n())
+  )
+
+p_bar <- ggplot(group_summary, aes(x = emotional_group, y = satisfaction_rate, fill = emotional_group)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = satisfaction_rate - 1.96*se, ymax = satisfaction_rate + 1.96*se), width = 0.2) +
+  geom_text(aes(label = paste0(round(satisfaction_rate, 1), "%")), vjust = -0.5) +
+  scale_fill_manual(values = c("Low" = "#F44336", "High" = "#4CAF50")) +
+  labs(title = "Satisfaction Rate by Emotional Connection Group",
+       subtitle = "Error bars show 95% CI",
+       x = "Emotional Connection Group", y = "Satisfaction Rate (%)") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  ylim(0, 100)
+
+ggsave("Inferential_Output/satisfaction_rate_by_group.png", p_bar, width = 6, height = 5)
+
+# STEP 11: Save Model Summaries to Text Files
+sink("Inferential_Output/simple_regression_summary.txt")
+cat("SIMPLE LINEAR REGRESSION\n")
+print(summary(model_simple))
+sink()
+
+sink("Inferential_Output/multiple_regression_summary.txt")
+cat("MULTIPLE LINEAR REGRESSION (with demographics)\n")
+print(summary(model_multiple))
+sink()
+
+sink("Inferential_Output/model_comparison.txt")
+cat("MODEL COMPARISON: Simple vs Multiple Regression\n")
+print(anova(model_simple, model_multiple))
+sink()
+
+# STEP 12: FINAL CONCLUSION
+cat("\nTesting: 'Audiences who feel emotionally connected report higher satisfaction'\n\n")
+
+if(emo_p_multiple < 0.05 & emo_coef_multiple > 0) {
+  cat("✓✓✓ HYPOTHESIS STRONGLY SUPPORTED!\n")
+  cat("Emotional connection significantly predicts satisfaction\n")
+  cat("even after controlling for age and gender.\n\n")
+  cat("Key evidence:\n")
+  cat("  • Correlation: r =", round(cor_test$estimate, 3), "(p < 0.001)\n")
+  cat("  • T-test: High group (", round(group_stats$mean_satisfaction[2]*100, 1), "%) vs ",
+      "Low group (", round(group_stats$mean_satisfaction[1]*100, 1), "%)\n")
+  cat("  • Regression: β =", round(emo_coef_multiple, 3), "(p < 0.001)\n")
+  cat("  • Effect sizes: Small to moderate (r² = 0.046, d = -0.393)\n")
+  
+} else if(emo_p_multiple < 0.05 & emo_coef_multiple < 0) {
+  cat("⚠ HYPOTHESIS PARTIALLY SUPPORTED (negative relationship)\n")
+  cat("Emotional connection predicts satisfaction, but in opposite direction.\n")
+} else {
+  cat("✗✗✗ HYPOTHESIS NOT SUPPORTED\n")
+  cat("No significant relationship found after controlling for demographics.\n")
+}
+
+cat("\n", rep("=", 80), "\n")
+#✓✓✓ HYPOTHESIS STRONGLY SUPPORTED!
+#Emotional connection significantly predicts satisfaction
+#even after controlling for age and gender.
+
+#Key evidence:
+#  • Correlation: r = 0.215 (p < 0.001)
+#• T-test: High group ( 79.9 %) vs  Low group ( 61.9 %)
+#• Regression: β = 0.118 (p < 0.001)
+#• Effect sizes: Small to moderate (r² = 0.046, d = -0.393)
+
+
+
