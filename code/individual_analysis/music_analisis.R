@@ -67,6 +67,7 @@ cat("Age range before:", min(music_data_clean$age), "to", max(music_data_clean$a
 music_data_clean <- music_data_clean[music_data_clean$age >= 10 & music_data_clean$age <= 90, ]
 cat("Age range after:", min(music_data_clean$age), "to", max(music_data_clean$age), "\n") # 10 to 82
 
+
 # Convert categorical variables
 music_data_clean$gender <- factor(music_data_clean$gender,
                                   levels = c(0, 1),
@@ -190,7 +191,7 @@ music_sample <- music_sample %>%
                          include.lowest = TRUE))
 
 # Save sampled data
-write.csv(music_sample, "SRS_sampled_1500_emotifyData.csv", row.names = FALSE)
+write.csv(music_sample, "sample_music_dataset.csv", row.names = FALSE)
 
 # Check if sample is representative
 cat("\nPopulation vs Sample comparison:\n")
