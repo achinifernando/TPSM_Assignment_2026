@@ -3,7 +3,7 @@
 # TPSM Assignment 2026
 # ============================================================================
 # Activity: Social Media
-# Dataset: Social Media Dataset  
+# Dataset: Social Media Sponsership and Engagement Dataset  
 # Collection period: 2023 May - 2025 May
 # Total records: 52,215 social media posts
 # Platforms: Instagram, TikTok, YouTube, Bilibili, RedNote
